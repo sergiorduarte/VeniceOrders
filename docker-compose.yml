@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: venice-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Venice@2025!
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks:
+      - venice-network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: venice-mongodb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=Venice@2025!
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - venice-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: venice-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - venice-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: venice-rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=Venice@2025!
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - venice-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: venice-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__SqlServer=Server=sqlserver;Database=VeniceOrders;User Id=sa;Password=Venice@2025!;TrustServerCertificate=True
+      - ConnectionStrings__MongoDB=mongodb://admin:Venice@2025!@mongodb:27017
+      - ConnectionStrings__Redis=redis:6379
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=admin
+      - RabbitMQ__Password=Venice@2025!
+      - JWT__Secret=VeniceOrdersSecretKey2025SuperSecretKeyForJWT
+      - JWT__Issuer=VeniceOrders
+      - JWT__Audience=VeniceOrdersAPI
+    ports:
+      - "5000:8080"
+    depends_on:
+      - sqlserver
+      - mongodb
+      - redis
+      - rabbitmq
+    networks:
+      - venice-network
+
+volumes:
+  sqlserver-data:
+  mongodb-data:
+
+networks:
+  venice-network:
+    driver: bridge
